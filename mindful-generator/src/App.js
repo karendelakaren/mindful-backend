@@ -42,13 +42,18 @@ const ActionsContainer = styled.div`
   }
 `;
 
+const formatDate = (selectedDate) => format(selectedDate, 'yyyy-MM-dd');
+const sortCues = (cues) => cues.sort((a,b) => {
+  return new Date(a.selectedDate) - new Date(b.selectedDate);
+});
+
 function App() {
   const [selectedDate, handleDateChange] = useState(new Date());
   const [shortTitle, handleShortTitleChange] = useState('');
   const [title, handleTitleChange] = useState('');
   const [description, handleDescriptionChange] = useState('');
 
-  const [cuesList, setCuesList] = useState({});
+  const [cuesList, setCuesList] = useState([]);
 
   const [open, setOpen] = React.useState(false);
 
@@ -72,33 +77,35 @@ function App() {
       const res = await fetch('http://localhost:4000/');
       const cues = await res.json();
       setCuesList(cues);
+
     }
     callCues();
+
+
   }, [])
 
   const saveCue = () => {
-    const cues = {
+    const cues = [
       ...cuesList,
-      [format(selectedDate, 'yyyy-MM-dd')]: {
+      {
+        formattedDate: formatDate(selectedDate),
         selectedDate: selectedDate.toString(),
         shortTitle,
         title,
         description,
       }
-    }
+    ];
 
-    const sortedCues = {};
-    Object.keys(cues).sort().forEach(function(key) {
-      sortedCues[key] = cues[key];
-    });
+    sortCues(cues);
 
-    setCuesList(sortedCues);
+    setCuesList(cues);
     resetValues();
   }
 
   const handleSubmit = () => {
-    const newDate = format(selectedDate, 'yyyy-MM-dd');
-    if (cuesList[newDate]) {
+    const existingDate = cuesList.findIndex(item => item.formattedDate === formatDate(selectedDate))
+
+    if (existingDate !== -1) {
       openDialog()
     } else {
       saveCue();
@@ -106,7 +113,24 @@ function App() {
   }
 
   const overwriteCue = () => {
-    saveCue();
+    const existingDate = cuesList.findIndex(item => item.formattedDate === formatDate(selectedDate))
+
+    setCuesList(cues => {
+      cues[existingDate] = {
+        formattedDate: formatDate(selectedDate),
+        selectedDate: selectedDate.toString(),
+        shortTitle,
+        title,
+        description,
+      }
+
+      sortCues(cues);
+
+      return cues;
+    })
+
+
+    resetValues();
     handleClose();
   }
 
@@ -179,28 +203,28 @@ function App() {
             </ButtonContainer>
           </form>
         </StyledPaper>
-        {Object.keys(cuesList).map((cuesKey) => (
-          <StyledPaper key={cuesKey}>
+        {cuesList.map((cue) => (
+          <StyledPaper key={cue.formattedDate}>
             <Typography variant="body1">
-              {cuesList[cuesKey].selectedDate}
+              {cue.selectedDate}
             </Typography>
             <Typography variant="h5">
-              {cuesList[cuesKey].shortTitle}
+              {cue.shortTitle}
             </Typography>
             <Typography variant="h6">
-              {cuesList[cuesKey].title}
+              {cue.title}
             </Typography>
             <Typography variant="body1">
-              {cuesList[cuesKey].description}
+              {cue.description}
             </Typography>
             <ActionsContainer>
               <Button
                 color="primary"
                 onClick={() => {
-                  handleDateChange(new Date(cuesList[cuesKey].selectedDate));
-                  handleShortTitleChange(cuesList[cuesKey].shortTitle);
-                  handleTitleChange(cuesList[cuesKey].title);
-                  handleDescriptionChange(cuesList[cuesKey].description);
+                  handleDateChange(new Date(cue.selectedDate));
+                  handleShortTitleChange(cue.shortTitle);
+                  handleTitleChange(cue.title);
+                  handleDescriptionChange(cue.description);
                 }}
               >
                 Edit
@@ -208,8 +232,7 @@ function App() {
               <Button
                 color="secondary"
                 onClick={() => {
-                  const filteredList = {...cuesList};
-                  delete filteredList[cuesKey];
+                  const filteredList = cuesList.filter(item => item.selectedDate !== cue.selectedDate)
                   setCuesList(filteredList)
                 }}
               >
